@@ -1,0 +1,43 @@
+name: FoodPharmer Daily Report
+
+on:
+  schedule:
+    - cron: "30 3 * * *"   # 9:00 AM IST every day
+  workflow_dispatch:         # manual trigger from GitHub UI
+
+jobs:
+  run-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      APIFY_TOKEN:     ${{ secrets.APIFY_TOKEN }}
+      GEMINI_API_KEY:  ${{ secrets.GEMINI_API_KEY }}
+      GROQ_API_KEY:    ${{ secrets.GROQ_API_KEY }}
+      GMAIL_USER:      ${{ secrets.GMAIL_USER }}
+      GMAIL_APP_PASS:  ${{ secrets.GMAIL_APP_PASS }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run scraper
+        working-directory: instagram_scorer
+        run: python scraper.py
+
+      - name: Commit updated history
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add instagram_scorer/history_ig.json \
+                  instagram_scorer/followers_ig.json \
+                  instagram_scorer/snapshots_ig.json
+          git diff --cached --quiet || git commit -m "chore: update instagram_scorer history [skip ci]"
+          git push
